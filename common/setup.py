@@ -18,7 +18,7 @@ setup(
         'Programming Language :: Python :: 3.9',
     ],
     keywords='audoai',
-    packages=['audoai'],
+    packages=['audoai.common'],
     install_requires=[
         'requests'
     ],
