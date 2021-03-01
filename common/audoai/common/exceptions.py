@@ -12,6 +12,12 @@ class NoiseRemovalFailed(AudoException):
     """Raised when noise removal failed for an unknown reason"""
     pass
 
+
+class InsufficientCredits(AudoException):
+    """Raised when the account doesn't have enough credits"""
+    pass
+
+
 class Unauthorized(AudoException):
     """Raised when the provided API key is incorrect"""
     pass

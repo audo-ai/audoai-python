@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='audoai-common',
-    version='0.1.1',
+    version='0.2.0',
     description='Library containing shared code for Audo AI APIs',
     url='https://github.com/audo-ai/audoai-python',
     author='Audo AI',

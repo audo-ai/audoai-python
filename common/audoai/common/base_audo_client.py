@@ -31,7 +31,7 @@ class BaseAudoClient:
         on_code = on_code or {}
         headers = kwargs.get('headers', {})
         headers = {k.lower(): v for k, v in headers.items()}
-        headers.setdefault('authorization', 'Bearer {}'.format(self.api_key))
+        headers.setdefault('x-api-key', self.api_key)
         kwargs['headers'] = headers
 
         r = requests.request(method, self.url(route), **kwargs)

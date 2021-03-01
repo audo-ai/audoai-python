@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='audoai-noise-removal',
-    version='0.1.1',
+    version='0.2.0',
     description='Python client for Audo AI noise removal APIs',
     url='https://github.com/audo-ai/audoai-python',
     author='Audo AI',
@@ -20,6 +20,7 @@ setup(
     keywords='audoai',
     packages=['audoai.noise_removal'],
     install_requires=[
-        'audoai-common>=0.1.1'
+        'audoai-common>=0.2.0',
+        'websocket_client'
     ],
 )

@@ -1,38 +1,54 @@
+import json
 from io import BufferedIOBase
 from os.path import basename
-from time import sleep
-from typing import Union
+from typing import Union, Callable
 
 from audoai.common import BaseAudoClient, MalformedFile, NoiseRemovalFailed, \
-    try_get_json, AudoException
+    try_get_json, AudoException, InsufficientCredits
 from audoai.noise_removal.wav_audio_result import WavAudioResult
+from websocket import create_connection
 
 
 class NoiseRemovalClient(BaseAudoClient):
     """Client to remove noise from audio files"""
+
     def __init__(self, api_key: str, base_url: str = None):
         super().__init__(api_key, base_url)
 
-    def process(self, file: Union[str, BufferedIOBase], extension: str = None, poll_interval: float = 0.5):
+    def process(
+        self,
+        file: Union[str, BufferedIOBase],
+        input_extension: str = None,
+        output_extension: str = '.wav',
+        on_update: Callable[[dict], None] = lambda _: None
+    ):
         """
         Remove non-speech noise from an audio file
 
         Args:
             file: Either a filename or a file object opened in binary mode
-            extension: Extension (ie. ".wav") of file if a file object is provided
+            input_extension: Extension (ie. ".wav") of file if a file object is provided
+            output_extension: Extension (ie. ".wav") of output file. Audio will be transcoded
+            on_update: Function called with every new dict update object while in_progress or queued
         Returns:
             result: An object containing a reference to the processed audio file
         """
-        job_id = self.create_job(file, extension)
-        return self.wait_for_job_id(job_id, poll_interval)
+        job_id = self.create_job(file, input_extension, output_extension)
+        return self.wait_for_job_id(job_id, on_update)
 
-    def create_job(self, file: Union[str, BufferedIOBase], extension: str = None) -> str:
+    def create_job(
+        self,
+        file: Union[str, BufferedIOBase],
+        input_extension: str = None,
+        output_extension: str = '.wav'
+    ) -> str:
         """
         Create a job to remove non-speech noise from an audio file
 
         Args:
             file: Either a filename or a file object opened in binary mode
-            extension: Extension (ie. ".wav") of file if a file object is provided
+            input_extension: Extension (ie. ".wav") of file if a file object is provided
+            output_extension: Extension (ie. ".wav") of output file. Audio will be transcoded
         Returns:
             job_id: A string representing the noise removal job id
         """
@@ -40,10 +56,10 @@ class NoiseRemovalClient(BaseAudoClient):
             file_name = basename(file)
             file = open(file, 'rb')
             on_exit = file.close
-            if extension is not None and not file_name.endswith('.' + extension.strip('.')):
+            if input_extension is not None and not file_name.endswith('.' + input_extension.strip('.')):
                 raise ValueError('Extension does not match provided file extension.')
         elif isinstance(file, BufferedIOBase):
-            file_name = 'file.{}'.format(extension.strip('.'))
+            file_name = 'file.{}'.format(input_extension.strip('.'))
             on_exit = lambda: None
         else:
             raise TypeError('Unknown object passed as file argument')
@@ -53,8 +69,10 @@ class NoiseRemovalClient(BaseAudoClient):
                 '/remove-noise',
                 files=dict(file=(file_name, file)),
                 on_code={
-                    422: lambda r: MalformedFile(try_get_json(r, 'detail'))
-                }
+                    422: lambda r: MalformedFile(try_get_json(r, 'detail')),
+                    400: lambda r: InsufficientCredits(try_get_json(r, 'detail'))
+                },
+                params={'output_ext': output_extension}
             )['jobId']
         finally:
             on_exit()
@@ -62,25 +80,39 @@ class NoiseRemovalClient(BaseAudoClient):
     def get_status(self, job_id: str) -> dict:
         return self.request('get', '/remove-noise/{}/status'.format(job_id))
 
-    def wait_for_job_id(self, job_id: str, poll_interval: float = 0.5) -> WavAudioResult:
+    def wait_for_job_id(self, job_id: str, on_update: Callable[[dict], None] = lambda _: None) -> WavAudioResult:
         """
         Wait for a noise removal job id to finish and return the result
         or raise an exception if processing fails
 
         Args:
             job_id: Job id from create_job to monitor
-            poll_interval: How long in seconds to wait before checking for updates
+            on_update: Function called with every new dict update object while in_progress or queued
         Returns:
             result: Audio result of job
         """
-        while True:
-            status = self.get_status(job_id)
-            state = status['state']
-            if state in ['in_progress', 'queued']:
-                sleep(poll_interval)
-            elif state == 'failed':
-                raise NoiseRemovalFailed(status.get('reason', ''))
-            elif state == 'succeeded':
-                return WavAudioResult(status['processedUrl'])
-            else:
-                raise AudoException("Server replied with unknown status: {}".format(status))
+        without_prefix = self.base_url.replace("http://", "")
+        without_prefix = without_prefix.replace("https://", "")
+        websocket_url = "ws://" + without_prefix + "/remove-noise/{}/ws".format(job_id)
+        auth_header = {'Authorization': 'Bearer {}'.format(self.api_key)}
+        ws = create_connection(websocket_url, header=auth_header)
+        try:
+            for status_str in ws:
+                try:
+                    status = json.loads(status_str)
+                except ValueError:
+                    raise AudoException("Malformed response from server during websocket communication")
+                except OSError:
+                    raise AudoException("Network error while communicating to backend")
+
+                state = status['state']
+                if state in ['in_progress', 'queued']:
+                    on_update(status)
+                elif state == 'failed':
+                    raise NoiseRemovalFailed(status.get('reason', ''))
+                elif state == 'succeeded':
+                    return WavAudioResult(self.base_url + status['processedPath'])
+                else:
+                    raise AudoException("Server replied with unknown status: {}".format(status))
+        finally:
+            ws.close()
