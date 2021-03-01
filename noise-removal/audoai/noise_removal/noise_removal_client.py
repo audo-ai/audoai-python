@@ -91,13 +91,13 @@ class NoiseRemovalClient(BaseAudoClient):
         Returns:
             result: Audio result of job
         """
-        without_prefix = self.base_url.replace("http://", "")
-        without_prefix = without_prefix.replace("https://", "")
-        websocket_url = "ws://" + without_prefix + "/remove-noise/{}/ws".format(job_id)
-        auth_header = {'Authorization': 'Bearer {}'.format(self.api_key)}
-        ws = create_connection(websocket_url, header=auth_header)
+        wss_base = self.base_url.replace("http://", "ws://")
+        wss_base = wss_base.replace("https://", "wss://")
+        wss_url = wss_base + "/wss/remove-noise/{}/status".format(job_id)
+        auth_header = {'x-api-key': self.api_key}
+        websocket = create_connection(wss_url, header=auth_header)
         try:
-            for status_str in ws:
+            for status_str in websocket:
                 try:
                     status = json.loads(status_str)
                 except ValueError:
@@ -115,4 +115,4 @@ class NoiseRemovalClient(BaseAudoClient):
                 else:
                     raise AudoException("Server replied with unknown status: {}".format(status))
         finally:
-            ws.close()
+            websocket.close()
