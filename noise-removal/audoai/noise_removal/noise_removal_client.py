@@ -72,7 +72,7 @@ class NoiseRemovalClient(BaseAudoClient):
                     422: lambda r: MalformedFile(try_get_json(r, 'detail')),
                     400: lambda r: InsufficientCredits(try_get_json(r, 'detail'))
                 },
-                params={'output_ext': output_extension}
+                params={'outputExt': output_extension}
             )['jobId']
         finally:
             on_exit()
