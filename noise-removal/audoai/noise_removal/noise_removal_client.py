@@ -1,6 +1,6 @@
 import json
 from io import BufferedIOBase
-from os.path import basename
+from os.path import basename, isfile
 from typing import Union, Callable
 
 from audoai.common import BaseAudoClient, MalformedFile, NoiseRemovalFailed, \
@@ -17,38 +17,46 @@ class NoiseRemovalClient(BaseAudoClient):
 
     def process(
         self,
-        file: Union[str, BufferedIOBase],
+        input: Union[str, BufferedIOBase],
         input_extension: str = None,
         output_extension: str = '.wav',
+        output: str = None,
         on_update: Callable[[dict], None] = lambda _: None
-    ):
+    ) -> WavAudioResult:
         """
         Remove non-speech noise from an audio file
 
         Args:
-            file: Either a filename or a file object opened in binary mode
-            input_extension: Extension (ie. ".wav") of file if a file object is provided
+            input: A filename, binary file-object, or a URL pointing to the audio input
+            input_extension: Extension (ie. ".wav") of file (only needed with file object)
             output_extension: Extension (ie. ".wav") of output file. Audio will be transcoded
+            output: Optional URL to perform a PUT request with output audio
             on_update: Function called with every new dict update object while in_progress or queued
         Returns:
             result: An object containing a reference to the processed audio file
         """
-        job_id = self.create_job(file, input_extension, output_extension)
+        if isinstance(input, BufferedIOBase) or isfile(input):
+            job_input = self.upload(input, input_extension)
+        else:
+            job_input = str(input)
+            if not job_input.startswith("http"):
+                raise TypeError(
+                    "input argument must be a filename, a binary file object, or a URL"
+                )
+        job_id = self.create_job(job_input, output_extension, output)
         return self.wait_for_job_id(job_id, on_update)
 
-    def create_job(
+    def upload(
         self,
         file: Union[str, BufferedIOBase],
         input_extension: str = None,
-        output_extension: str = '.wav'
     ) -> str:
         """
-        Create a job to remove non-speech noise from an audio file
+        Uploads an audio file for future processing. Returns a fileId that can be used later.
 
         Args:
             file: Either a filename or a file object opened in binary mode
             input_extension: Extension (ie. ".wav") of file if a file object is provided
-            output_extension: Extension (ie. ".wav") of output file. Audio will be transcoded
         Returns:
             job_id: A string representing the noise removal job id
         """
@@ -66,16 +74,42 @@ class NoiseRemovalClient(BaseAudoClient):
         try:
             return self.request(
                 'post',
-                '/remove-noise',
+                '/upload',
                 files=dict(file=(file_name, file)),
                 on_code={
-                    422: lambda r: MalformedFile(try_get_json(r, 'detail')),
-                    400: lambda r: InsufficientCredits(try_get_json(r, 'detail'))
-                },
-                params={'outputExt': output_extension}
-            )['jobId']
+                    422: lambda r: MalformedFile(try_get_json(r, 'detail'))
+                }
+            )['fileId']
         finally:
             on_exit()
+
+    def create_job(
+        self,
+        input: str,
+        output_extension: str = '.wav',
+        output: str = None
+    ) -> str:
+        """
+        Create a job to remove non-speech noise from an audio file
+
+        Args:
+            input: Either a fileId from upload() or a URL of an audio file
+            output_extension: Extension (ie. ".wav") of output file. Audio will be transcoded
+            output: Optional URL to perform a PUT request with output audio
+        Returns:
+            job_id: A string representing the noise removal job id
+        """
+        body = dict(input=input, outputExtension=output_extension)
+        if output:
+            body['output'] = output
+        return self.request(
+            'post',
+            '/remove-noise',
+            json=body,
+            on_code={
+                400: lambda r: InsufficientCredits(try_get_json(r, 'detail'))
+            }
+        )['jobId']
 
     def get_status(self, job_id: str) -> dict:
         return self.request('get', '/remove-noise/{}/status'.format(job_id))
@@ -106,12 +140,12 @@ class NoiseRemovalClient(BaseAudoClient):
                     raise AudoException("Network error while communicating to backend")
 
                 state = status['state']
-                if state in ['in_progress', 'queued']:
+                if state in ['downloading', 'in_progress', 'queued']:
                     on_update(status)
                 elif state == 'failed':
                     raise NoiseRemovalFailed(status.get('reason', ''))
                 elif state == 'succeeded':
-                    return WavAudioResult(self.base_url + status['processedPath'])
+                    return WavAudioResult(self.base_url + status['downloadPath'])
                 else:
                     raise AudoException("Server replied with unknown status: {}".format(status))
         finally:
