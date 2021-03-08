@@ -22,7 +22,7 @@ result.save('cleaned-audio.wav')
 Install via PyPI:
 
 ```console
-pip3 install audoai-noise-removal
+pip3 install --upgrade audoai-noise-removal
 ```
 
 ## Contact
