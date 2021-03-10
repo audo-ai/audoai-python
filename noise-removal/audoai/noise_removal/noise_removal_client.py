@@ -19,7 +19,7 @@ class NoiseRemovalClient(BaseAudoClient):
         self,
         input: Union[str, BufferedIOBase],
         input_extension: str = None,
-        output_extension: str = '.wav',
+        output_extension: str = None,
         output: str = None,
         on_update: Callable[[dict], None] = lambda _: None
     ) -> WavAudioResult:
@@ -86,7 +86,7 @@ class NoiseRemovalClient(BaseAudoClient):
     def create_job(
         self,
         input: str,
-        output_extension: str = '.wav',
+        output_extension: str = None,
         output: str = None
     ) -> str:
         """
@@ -99,13 +99,10 @@ class NoiseRemovalClient(BaseAudoClient):
         Returns:
             job_id: A string representing the noise removal job id
         """
-        body = dict(input=input, outputExtension=output_extension)
-        if output:
-            body['output'] = output
         return self.request(
             'post',
             '/remove-noise',
-            json=body,
+            json=dict(input=input, outputExtension=output_extension, output=output),
             on_code={
                 400: lambda r: InsufficientCredits(try_get_json(r, 'detail'))
             }
