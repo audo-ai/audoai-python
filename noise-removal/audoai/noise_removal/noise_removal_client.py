@@ -65,8 +65,10 @@ class NoiseRemovalClient(BaseAudoClient):
             file = open(file, 'rb')
             on_exit = file.close
             if input_extension is not None and not file_name.endswith('.' + input_extension.strip('.')):
-                raise ValueError('Extension does not match provided file extension.')
+                raise TypeError('Extension does not match provided file extension.')
         elif isinstance(file, BufferedIOBase):
+            if input_extension is None:
+                raise TypeError('Must specify input_extension when passing raw file')
             file_name = 'file.{}'.format(input_extension.strip('.'))
             on_exit = lambda: None
         else:
