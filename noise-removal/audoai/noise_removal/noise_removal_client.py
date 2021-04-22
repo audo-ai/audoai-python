@@ -21,7 +21,7 @@ class NoiseRemovalClient(BaseAudoClient):
         input_extension: str = None,
         output_extension: str = None,
         output: str = None,
-        on_update: Callable[[dict], None] = lambda _: None
+        on_update: Callable[[dict], None] = lambda x: print(x)
     ) -> WavAudioResult:
         """
         Remove non-speech noise from an audio file
@@ -113,7 +113,7 @@ class NoiseRemovalClient(BaseAudoClient):
     def get_status(self, job_id: str) -> dict:
         return self.request('get', '/remove-noise/{}/status'.format(job_id))
 
-    def wait_for_job_id(self, job_id: str, on_update: Callable[[dict], None] = lambda _: None) -> WavAudioResult:
+    def wait_for_job_id(self, job_id: str, on_update: Callable[[dict], None] = lambda x: print(x)) -> WavAudioResult:
         """
         Wait for a noise removal job id to finish and return the result
         or raise an exception if processing fails
@@ -140,7 +140,8 @@ class NoiseRemovalClient(BaseAudoClient):
 
                 state = status['state']
                 if state in ['downloading', 'in_progress', 'queued']:
-                    on_update(status)
+                    if on_update:
+                        on_update(status)
                 elif state == 'failed':
                     raise NoiseRemovalFailed(status.get('reason', ''))
                 elif state == 'succeeded':
