@@ -36,6 +36,7 @@ class NoiseRemovalClient(BaseAudoClient):
             result: An object containing a reference to the processed audio file
         """
         if isinstance(input, BufferedIOBase) or isfile(input):
+            on_update({'state': 'uploading'})
             job_input = self.upload(input, input_extension)
         else:
             job_input = str(input)
@@ -43,6 +44,7 @@ class NoiseRemovalClient(BaseAudoClient):
                 raise TypeError(
                     "input argument must be a filename, a binary file object, or a URL"
                 )
+        on_update({'state': 'creating_job'})
         job_id = self.create_job(job_input, output_extension, output)
         return self.wait_for_job_id(job_id, on_update)
 
