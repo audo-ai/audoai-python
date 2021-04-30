@@ -126,11 +126,7 @@ class NoiseRemovalClient(BaseAudoClient):
         Returns:
             result: Audio result of job
         """
-        wss_base = self.base_url.replace("http://", "ws://")
-        wss_base = wss_base.replace("https://", "wss://")
-        wss_url = wss_base + "/wss/remove-noise/{}/status".format(job_id)
-        auth_header = {'x-api-key': self.api_key}
-        websocket = create_connection(wss_url, header=auth_header)
+        websocket = self.connect_websocket(job_id)
         try:
             for status_str in websocket:
                 try:
