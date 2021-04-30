@@ -14,7 +14,8 @@ class BaseAudoClient:
 
     def __init__(self, api_key: str, base_url: str = None):
         self.api_key = api_key
-        self.base_url = base_url or self.default_base_url
+        self.base_url = self.default_base_url if base_url is None else base_url
+        self.request_handler = requests.request
 
     def request(self, method: str, route: str, on_code: dict = None, **kwargs):
         """
@@ -34,7 +35,7 @@ class BaseAudoClient:
         headers.setdefault('x-api-key', self.api_key)
         kwargs['headers'] = headers
 
-        r = requests.request(method, self.url(route), **kwargs)
+        r = self.request_handler(method, self.url(route), **kwargs)
         if r.status_code in on_code:
             result = on_code[r.status_code](r)
             if isinstance(result, Exception):
@@ -52,3 +53,10 @@ class BaseAudoClient:
     def url(self, route: str) -> str:
         """Create a full URL from a route (ie. /remove-noise)"""
         return self.base_url + route
+
+    def connect_websocket(self, job_id):
+        wss_base = self.base_url.replace("http://", "ws://")
+        wss_base = wss_base.replace("https://", "wss://")
+        wss_url = wss_base + "/wss/remove-noise/{}/status".format(job_id)
+        auth_header = {'x-api-key': self.api_key}
+        return create_connection(wss_url, header=auth_header)
