@@ -2,6 +2,7 @@ import logging
 from time import sleep
 
 import requests
+from websocket import create_connection
 
 from .exceptions import Unauthorized
 

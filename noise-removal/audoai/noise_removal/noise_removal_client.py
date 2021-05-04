@@ -6,7 +6,6 @@ from typing import Union, Callable
 from audoai.common import BaseAudoClient, MalformedFile, NoiseRemovalFailed, \
     try_get_json, AudoException, InsufficientCredits
 from audoai.noise_removal.wav_audio_result import WavAudioResult
-from websocket import create_connection
 
 
 class NoiseRemovalClient(BaseAudoClient):
