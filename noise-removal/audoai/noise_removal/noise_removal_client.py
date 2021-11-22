@@ -135,10 +135,11 @@ class NoiseRemovalClient(BaseAudoClient):
                 except OSError:
                     raise AudoException("Network error while communicating to backend")
 
+                if on_update:
+                     on_update(status)
                 state = status['state']
                 if state in ['downloading', 'in_progress', 'queued']:
-                    if on_update:
-                        on_update(status)
+                    pass
                 elif state == 'failed':
                     raise NoiseRemovalFailed(status.get('reason', ''))
                 elif state == 'succeeded':
