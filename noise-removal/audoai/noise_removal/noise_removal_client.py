@@ -20,6 +20,7 @@ class NoiseRemovalClient(BaseAudoClient):
         input_extension: str = None,
         output_extension: str = None,
         output: str = None,
+        auto_volume: Union[bool, float] = False,
         on_update: Callable[[dict], None] = lambda x: print(x)
     ) -> WavAudioResult:
         """
@@ -30,6 +31,7 @@ class NoiseRemovalClient(BaseAudoClient):
             input_extension: Extension (ie. ".wav") of file (only needed with file object)
             output_extension: Extension (ie. ".wav") of output file. Audio will be transcoded
             output: Optional URL to perform a PUT request with output audio
+            auto_volume: Whether to normalize the audio volume, optionally to a specific db
             on_update: Function called with every new dict update object while in_progress or queued
         Returns:
             result: An object containing a reference to the processed audio file
@@ -44,7 +46,7 @@ class NoiseRemovalClient(BaseAudoClient):
                     "input argument must be a filename, a binary file object, or a URL"
                 )
         on_update({'state': 'creating_job'})
-        job_id = self.create_job(job_input, output_extension, output)
+        job_id = self.create_job(job_input, output_extension, output, auto_volume)
         return self.wait_for_job_id(job_id, on_update)
 
     def upload(
@@ -90,7 +92,8 @@ class NoiseRemovalClient(BaseAudoClient):
         self,
         input: str,
         output_extension: str = None,
-        output: str = None
+        output: str = None,
+        auto_volume: Union[bool, float] = False
     ) -> str:
         """
         Create a job to remove non-speech noise from an audio file
@@ -99,13 +102,14 @@ class NoiseRemovalClient(BaseAudoClient):
             input: Either a fileId from upload() or a URL of an audio file
             output_extension: Extension (ie. ".wav") of output file. Audio will be transcoded
             output: Optional URL to perform a PUT request with output audio
+            auto_volume: Whether to normalize the audio volume, optionally to a specific db
         Returns:
             job_id: A string representing the noise removal job id
         """
         return self.request(
             'post',
             '/remove-noise',
-            json=dict(input=input, outputExtension=output_extension, output=output),
+            json=dict(input=input, outputExtension=output_extension, output=output, autoVolume=auto_volume),
             on_code={
                 400: lambda r: InsufficientCredits(try_get_json(r, 'detail'))
             }
