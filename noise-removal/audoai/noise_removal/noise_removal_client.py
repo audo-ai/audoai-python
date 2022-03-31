@@ -118,6 +118,9 @@ class NoiseRemovalClient(BaseAudoClient):
     def get_status(self, job_id: str) -> dict:
         return self.request('get', '/remove-noise/{}/status'.format(job_id))
 
+    def delete_results(self, job_id: str) -> dict:
+        return self.request('post', '/remove-noise/{}/delete-results'.format(job_id))
+
     def wait_for_job_id(self, job_id: str, on_update: Callable[[dict], None] = lambda x: print(x)) -> WavAudioResult:
         """
         Wait for a noise removal job id to finish and return the result
@@ -147,7 +150,7 @@ class NoiseRemovalClient(BaseAudoClient):
                 elif state == 'failed':
                     raise NoiseRemovalFailed(status.get('reason', ''))
                 elif state == 'succeeded':
-                    return WavAudioResult(self.base_url + status['downloadPath'])
+                    return WavAudioResult(self.base_url + status['downloadPath'], job_id)
                 else:
                     raise AudoException("Server replied with unknown status: {}".format(status))
         finally:

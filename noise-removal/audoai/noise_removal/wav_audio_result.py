@@ -6,8 +6,9 @@ import requests
 
 class WavAudioResult:
     """An audio result from the API in the form of a WAV file"""
-    def __init__(self, url: str):
+    def __init__(self, url: str, job_id: str):
         self.url = url
+        self.job_id = job_id
         self.ext = splitext(url)[1].lower()  # ie. ".wav"
 
     def save(self, filename: str):
@@ -20,4 +21,4 @@ class WavAudioResult:
                 shutil.copyfileobj(r.raw, f)
 
     def __repr__(self):
-        return 'WavAudioResult(url={!r})'.format(self.url)
+        return 'WavAudioResult(url={!r}, job_id={!r})'.format(self.url, self.job_id)
